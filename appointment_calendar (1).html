@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Appointment Calendar</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f3;color:#111;font-size:14px;min-height:100vh;padding:2rem}
+h1{font-size:22px;font-weight:500;margin-bottom:1.5rem}
+.card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:1.5rem;max-width:500px;margin-bottom:1.5rem}
+button{padding:8px 18px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111;cursor:pointer;font-size:13px;transition:background .15s}
+button:hover{background:#f0f0f0}
+button.primary{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4;font-weight:500}
+button.primary:hover{background:#d0e7f7}
+button.gcal-all{background:#1a73e8;color:#fff;border-color:#1a73e8;font-weight:500}
+button.gcal-all:hover{background:#1558b0}
+button:disabled{opacity:.4;cursor:not-allowed}
+input,select,textarea{padding:8px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111;font-size:13px;width:100%;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#1a73e8}
+textarea{resize:vertical;min-height:70px}
+.msg{font-size:13px;padding:10px 14px;border-radius:8px;margin:10px 0;line-height:1.5}
+.err{background:#fcebeb;color:#a32d2d;border:1px solid #f7c1c1}
+.ok{background:#eaf3de;color:#3b6d11;border:1px solid #c0dd97}
+.info{background:#e6f1fb;color:#185fa5;border:1px solid #b5d4f4}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:12px;color:#555;font-weight:500}
+.col-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tabs{display:flex;gap:6px;margin-bottom:1.25rem;align-items:center;flex-wrap:wrap}
+.tab{padding:6px 16px;border:1px solid #ddd;border-radius:999px;cursor:pointer;font-size:13px;background:transparent;color:#666}
+.tab.active{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
+.cal-nav{display:flex;align-items:center;gap:12px;margin-bottom:1rem}
+.cal-nav span{font-size:16px;font-weight:500;flex:1;text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dh{text-align:center;font-size:11px;font-weight:500;color:#888;padding:4px 0;text-transform:uppercase;letter-spacing:.04em}
+.dc{min-height:90px;border:1px solid #e5e5e5;border-radius:8px;padding:6px;background:#fff}
+.dc.om{opacity:.35;background:#f9f9f8}
+.dc.today{border-color:#1a73e8;border-width:2px}
+.dn{font-size:11px;font-weight:500;color:#888;margin-bottom:3px}
+.dc.today .dn{background:#e6f1fb;color:#185fa5;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.chip{font-size:10px;padding:2px 6px;border-radius:4px;margin-bottom:2px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#e6f1fb;color:#185fa5;border:1px solid #b5d4f4}
+.chip:hover{background:#d0e7f7}
+.chip.sent{background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7}
+.more{font-size:10px;color:#888}
+.list{display:flex;flex-direction:column;gap:8px}
+.ac{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:0;overflow:hidden;transition:box-shadow .15s}
+.ac:hover{box-shadow:0 2px 8px rgba(0,0,0,.08);border-color:#ccc}
+.ac-header{display:grid;grid-template-columns:56px 1fr;gap:0;cursor:pointer}
+.badge{background:#f0f4ff;text-align:center;padding:14px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.bm{font-size:10px;text-transform:uppercase;font-weight:600;color:#5c7cfa}
+.bd{font-size:22px;font-weight:600;line-height:1;color:#364fc7}
+.ac-body{padding:12px 14px 10px}
+.ac-name{font-size:15px;font-weight:600;color:#1a73e8;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:3px}
+.ac-name:hover{text-decoration:underline}
+.atime{font-size:12px;color:#1a73e8;font-weight:500;margin-bottom:4px}
+.am{font-size:12px;color:#666;display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px}
+.am a{color:#1a73e8;text-decoration:none}
+.am a:hover{text-decoration:underline}
+.anotes{font-size:12px;color:#666;background:#f9f9f8;border-radius:6px;padding:6px 10px;border-left:3px solid #e0e0e0;margin-top:6px;line-height:1.5}
+.ac-footer{padding:8px 14px 10px;border-top:1px solid #f0f0f0;display:flex;align-items:center;gap:8px}
+.gcal-btn{font-size:12px;padding:5px 12px;border:1px solid #a5d6a7;background:#e8f5e9;color:#2e7d32;border-radius:6px;cursor:pointer;font-weight:500}
+.gcal-btn:hover{background:#c8e6c9}
+.gcal-btn.sent{background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;cursor:default}
+.gcal-btn.sending{opacity:.6;cursor:not-allowed}
+.gcal-sent-label{font-size:11px;color:#2e7d32}
+/* Overlay */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
+.modal{background:#fff;border-radius:16px;padding:0;max-width:480px;width:100%;border:1px solid #e5e5e5;overflow:hidden;max-height:90vh;overflow-y:auto}
+.modal-head{padding:20px 24px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.modal-head h3{font-size:17px;font-weight:600;color:#111;margin:0}
+.modal-head .close-x{background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:0;line-height:1}
+.modal-head .close-x:hover{color:#111}
+.modal-body{padding:20px 24px}
+.modal-addr{font-size:13px;color:#555;margin-bottom:16px;display:flex;align-items:flex-start;gap:6px;line-height:1.4}
+.modal-addr a{color:#1a73e8;text-decoration:none}
+.modal-addr a:hover{text-decoration:underline}
+.modal-section{margin-bottom:18px}
+.modal-section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:10px}
+.mrow{display:flex;gap:8px;margin-bottom:8px;font-size:13px;align-items:flex-start}
+.mrow label{color:#666;min-width:90px;font-size:12px;font-weight:500;padding-top:2px}
+.mrow span{flex:1;color:#111}
+.mnotes{font-size:13px;background:#f9f9f8;border-radius:8px;padding:12px;border-left:3px solid #e0e0e0;line-height:1.6;color:#333}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.modal-footer{padding:16px 24px;border-top:1px solid #f0f0f0;display:flex;gap:8px;justify-content:flex-end}
+.modal-footer button{min-width:100px}
+.map-btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:5px 12px;border:1px solid #b5d4f4;background:#e6f1fb;color:#185fa5;border-radius:6px;cursor:pointer;text-decoration:none;font-weight:500}
+.map-btn:hover{background:#d0e7f7}
+.ubar{display:flex;align-items:center;gap:10px;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #e5e5e5}
+.avatar{width:34px;height:34px;border-radius:50%;background:#e6f1fb;color:#185fa5;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;flex-shrink:0}
+.preview-table{overflow-x:auto;margin-bottom:1rem;background:#f9f9f8;border-radius:8px;padding:10px}
+.preview-table table{border-collapse:collapse;width:100%}
+.preview-table th{text-align:left;padding:3px 10px 3px 0;font-size:11px;font-weight:500;border-bottom:1px solid #e5e5e5;white-space:nowrap}
+.preview-table td{padding:3px 10px 3px 0;font-size:11px;color:#666}
+.bulk-bar{display:flex;align-items:center;gap:10px;margin-bottom:1rem;padding:10px 14px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;flex-wrap:wrap}
+#app{max-width:960px;margin:0 auto}
+.divider{border:none;border-top:1px solid #f0f0f0;margin:14px 0}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:#f0f0f0;color:#555;margin-right:4px}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>&#128197; Appointment Calendar</h1>
+  <div id="root"></div>
+</div>
+
+<script>
+const CLIENT_ID='445310454939-449aqo6u0akjaoc24f0tgb6kt3bbnfge.apps.googleusercontent.com';
+const SHEET_ID='1QXCdOj4RH9OeFnQ2rSu3laqD8z8MIfN6QSrh9yeOP3I';
+const SCOPES='https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/calendar.events';
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+let S={
+  phase:'auth',token:null,user:null,
+  headers:[],rows:[],
+  cols:{date:'',time:'',name:'',address:'',receptionist:'',notes:''},
+  appointments:[],view:'list',
+  calYear:new Date().getFullYear(),calMonth:new Date().getMonth(),
+  modal:null,       // {type:'appt', appt} or {type:'schedule', appt}
+  msg:null,loading:false,gsiReady:false,
+  gcalStatus:{},    // _id -> {state:'sending'|'sent'|'err', msg}
+  defaultTime:'09:00',
+  bulkSending:false,
+  // schedule form state
+  schedForm:{date:'',time:'09:00',duration:60,notes:''}
+};
+
+/* ── RENDER ── */
+function R(){
+  const root=document.getElementById('root');
+  if(!root)return;
+  root.innerHTML='';
+  const el=document.createElement('div');
+  if(S.phase==='auth')el.innerHTML=renderAuth();
+  else if(S.phase==='mapping')el.innerHTML=renderMapping();
+  else el.innerHTML=renderMain();
+  root.appendChild(el);
+  // overlay
+  document.getElementById('overlay')?.remove();
+  if(S.modal){
+    const ov=document.createElement('div');
+    ov.className='overlay';ov.id='overlay';
+    if(S.modal.type==='schedule') ov.innerHTML=renderScheduleModal(S.modal.appt);
+    else ov.innerHTML=renderApptModal(S.modal.appt);
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
+    bindModalEvents();
+  }
+  bind();
+}
+
+function closeModal(){S.modal=null;document.getElementById('overlay')?.remove();}
+
+/* ── AUTH ── */
+function renderAuth(){
+  return`<div class="card">
+    <div class="info msg" style="margin-bottom:12px">&#128274; Sign in with Google to load your sheet and manage appointments.</div>
+    ${S.msg?`<div class="msg ${S.msg.t}">${S.msg.text}</div>`:''}
+    <button class="primary" id="signin-btn" ${S.loading||!S.gsiReady?'disabled':''} style="width:100%;padding:11px 18px;font-size:14px">
+      ${!S.gsiReady?'Loading&#8230;':S.loading?'Signing in&#8230;':'&#128101; Sign in with Google'}
+    </button>
+    <p style="font-size:11px;color:#888;margin-top:10px;line-height:1.5">Requests read access to Sheets and write access to Google Calendar.</p>
+  </div>`;
+}
+
+/* ── MAPPING ── */
+function renderMapping(){
+  const labels={date:'Appointment date',time:'Appointment time (optional)',name:'Agent / client name',address:'Address',receptionist:"Receptionist's name",notes:'Last visit notes'};
+  const sel=f=>`<select id="col-${f}"><option value="">— select —</option>${S.headers.map((h,i)=>`<option value="${i}"${S.cols[f]===i?' selected':''}>${h}</option>`).join('')}</select>`;
+  const preview=S.rows.slice(0,3).map(r=>`<tr>${S.headers.map((_,i)=>`<td>${(r[i]||'').toString().slice(0,28)}</td>`).join('')}</tr>`).join('');
+  return`${ubar()}
+  <div class="ok msg">&#10003; Loaded ${S.rows.length} rows. Map your columns below.</div>
+  ${S.msg?`<div class="msg ${S.msg.t}">${S.msg.text}</div>`:''}
+  <div class="preview-table"><table><tr>${S.headers.map(h=>`<th>${h}</th>`).join('')}</tr>${preview}</table></div>
+  <div class="col-grid">${Object.keys(labels).map(f=>`<div class="field"><label>${labels[f]}</label>${sel(f)}</div>`).join('')}</div>
+  <div class="field" style="flex-direction:row;align-items:center;gap:10px;margin-bottom:14px">
+    <label style="min-width:110px;font-size:12px;font-weight:500;color:#555">Default time</label>
+    <input type="time" id="default-time" value="${S.defaultTime}" style="width:130px"/>
+    <span style="font-size:11px;color:#888">Used when no time column</span>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="primary" id="build-btn">Build calendar &#8594;</button>
+    <button id="reload-btn">&#8635; Reload sheet</button>
+  </div>`;
+}
+
+/* ── MAIN ── */
+function renderMain(){
+  const totalSent=S.appointments.filter(a=>S.gcalStatus[a._id]?.state==='sent').length;
+  return ubar()+`
+  <div class="bulk-bar">
+    <span style="font-size:13px;color:#444">&#128464; <strong>${S.appointments.length}</strong> agents &nbsp;|&nbsp; <span style="color:#2e7d32">&#10003; <strong>${totalSent}</strong> scheduled</span></span>
+    <div style="flex:1"></div>
+    <button class="gcal-all" id="send-all-btn" ${S.bulkSending?'disabled':''}>
+      ${S.bulkSending?'Scheduling&#8230;':'&#43; Add all to Google Calendar'}
+    </button>
+  </div>
+  <div class="tabs">
+    <div class="tab${S.view==='list'?' active':''}" data-view="list">List</div>
+    <div class="tab${S.view==='calendar'?' active':''}" data-view="calendar">Calendar</div>
+    <div style="flex:1"></div>
+    <button id="remap-btn" style="font-size:12px">&#8592; Remap</button>
+  </div>`+(S.view==='calendar'?calGrid():listView());
+}
+
+function ubar(){
+  if(!S.user)return'';
+  return`<div class="ubar">
+    <div class="avatar">${(S.user.name||S.user.email||'?').charAt(0).toUpperCase()}</div>
+    <div style="flex:1"><div style="font-size:13px;font-weight:500">${S.user.name||''}</div><div style="font-size:11px;color:#888">${S.user.email||''}</div></div>
+    <button id="signout-btn" style="font-size:12px">Switch account</button>
+  </div>`;
+}
+
+/* ── LIST VIEW ── */
+function listView(){
+  const sorted=[...S.appointments].sort((a,b)=>(!a.date?1:!b.date?-1:a.date-b.date));
+  if(!sorted.length)return`<p style="color:#888;font-size:13px;margin-top:1rem">No appointments found.</p>`;
+  return`<div class="list">`+sorted.map(a=>{
+    const st=S.gcalStatus[a._id];
+    const mapsUrl=a.address?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.address)}`:'';
+    return`<div class="ac">
+      <div class="ac-header" data-appt="${a._id}">
+        <div class="badge">
+          <div class="bm">${a.date?MONTHS[a.date.getMonth()].slice(0,3).toUpperCase():'—'}</div>
+          <div class="bd">${a.date?a.date.getDate():'?'}</div>
+        </div>
+        <div class="ac-body">
+          <div class="ac-name" data-schedule="${a._id}">
+            ${a.name||'Unknown'}
+            <span style="font-size:11px;background:#e6f1fb;color:#185fa5;padding:2px 7px;border-radius:999px;font-weight:500">Schedule &#43;</span>
+          </div>
+          ${a.time?`<div class="atime">&#128336; ${formatTime(a.time)}</div>`:''}
+          <div class="am">
+            ${a.address?`<span>&#128205; <a href="${mapsUrl}" target="_blank" title="Open in Google Maps">${a.address}</a></span>`:''}
+            ${a.receptionist?`<span>&#128100; ${a.receptionist}</span>`:''}
+          </div>
+          ${a.notes?`<div class="anotes">&#128221; <em>Last visit:</em> ${a.notes}</div>`:''}
+        </div>
+      </div>
+      <div class="ac-footer">
+        ${st?.state==='sent'
+          ?`<span class="gcal-sent-label">&#10003; Added to Google Calendar</span>`
+          :`<button class="gcal-btn${st?.state==='sending'?' sending':''}" data-gcal="${a._id}" ${st?.state==='sending'?'disabled':''}>
+              ${st?.state==='sending'?'&#8230; Adding':'&#43; Add to Google Cal'}
+            </button>`
+        }
+        ${st?.state==='err'?`<span style="font-size:11px;color:#a32d2d">&#9888; ${st.msg}</span>`:''}
+        ${a.address?`<a class="map-btn" href="${mapsUrl}" target="_blank">&#128205; Directions</a>`:''}
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+/* ── CALENDAR VIEW ── */
+function calGrid(){
+  const {calYear,calMonth,appointments}=S;
+  const dow=new Date(calYear,calMonth,1).getDay();
+  const dim=new Date(calYear,calMonth+1,0).getDate();
+  const today=new Date();
+  const byDay={};
+  appointments.forEach(a=>{
+    if(a.date&&a.date.getFullYear()===calYear&&a.date.getMonth()===calMonth){
+      const d=a.date.getDate();if(!byDay[d])byDay[d]=[];byDay[d].push(a);
+    }
+  });
+  let cells='';
+  for(let i=0;i<dow;i++)cells+=`<div class="dc om"><div class="dn">${new Date(calYear,calMonth,-dow+i+1).getDate()}</div></div>`;
+  for(let d=1;d<=dim;d++){
+    const isT=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;
+    const appts=byDay[d]||[];
+    cells+=`<div class="dc${isT?' today':''}"><div class="dn">${d}</div>
+      ${appts.slice(0,3).map(a=>`<div class="chip${S.gcalStatus[a._id]?.state==='sent'?' sent':''}" data-schedule="${a._id}">
+        ${S.gcalStatus[a._id]?.state==='sent'?'✓ ':''}${a.name||'Appt'}
+      </div>`).join('')}
+      ${appts.length>3?`<div class="more">+${appts.length-3} more</div>`:''}</div>`;
+  }
+  const rem=(dow+dim)%7===0?0:7-(dow+dim)%7;
+  for(let i=1;i<=rem;i++)cells+=`<div class="dc om"><div class="dn">${i}</div></div>`;
+  return`<div class="cal-nav">
+    <button id="prev-m">&#8592; Prev</button>
+    <span>${MONTHS[calMonth]} ${calYear}</span>
+    <button id="next-m">Next &#8594;</button>
+  </div>
+  <div class="cal-grid">${DAYS.map(d=>`<div class="dh">${d}</div>`).join('')}${cells}</div>`;
+}
+
+/* ── APPOINTMENT DETAIL MODAL ── */
+function renderApptModal(a){
+  const mapsUrl=a.address?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.address)}`:'';
+  const st=S.gcalStatus[a._id];
+  return`<div class="modal">
+    <div class="modal-head">
+      <h3>&#128464; ${a.name||'Appointment'}</h3>
+      <button class="close-x" id="close-modal">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      ${a.address?`<div class="modal-addr">&#128205; <span><a href="${mapsUrl}" target="_blank">${a.address}</a></span></div>`:''}
+      <div class="modal-section">
+        <div class="modal-section-title">Appointment info</div>
+        ${a.date?`<div class="mrow"><label>Date</label><span>${a.date.toDateString()}</span></div>`:''}
+        ${a.time?`<div class="mrow"><label>Time</label><span>${formatTime(a.time)}</span></div>`:''}
+        ${a.receptionist?`<div class="mrow"><label>Receptionist</label><span>${a.receptionist}</span></div>`:''}
+      </div>
+      ${a.notes?`<div class="modal-section">
+        <div class="modal-section-title">Last visit notes</div>
+        <div class="mnotes">${a.notes}</div>
+      </div>`:''}
+      ${st?.state==='sent'?`<div class="msg ok">&#10003; Added to Google Calendar</div>`:''}
+      ${st?.state==='err'?`<div class="msg err">&#9888; ${st.msg}</div>`:''}
+    </div>
+    <div class="modal-footer">
+      ${a.address?`<a class="map-btn" href="${mapsUrl}" target="_blank" style="margin-right:auto">&#128205; Directions</a>`:''}
+      <button id="close-modal-2">Close</button>
+      <button class="primary" id="open-schedule-modal">&#128197; Schedule visit</button>
+    </div>
+  </div>`;
+}
+
+/* ── SCHEDULE MODAL ── */
+function renderScheduleModal(a){
+  const mapsUrl=a.address?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.address)}`:'';
+  const f=S.schedForm;
+  const todayStr=new Date().toISOString().split('T')[0];
+  return`<div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3>&#128197; Schedule visit — ${a.name||''}</h3>
+        ${a.address?`<div style="font-size:12px;color:#666;margin-top:4px">&#128205; ${a.address}</div>`:''}
+      </div>
+      <button class="close-x" id="close-modal">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="sched-date" value="${f.date||todayStr}" min="${todayStr}"/>
+        </div>
+        <div class="field">
+          <label>Start time</label>
+          <input type="time" id="sched-time" value="${f.time||'09:00'}"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Duration</label>
+        <select id="sched-duration">
+          <option value="30" ${f.duration===30?'selected':''}>30 minutes</option>
+          <option value="45" ${f.duration===45?'selected':''}>45 minutes</option>
+          <option value="60" ${f.duration===60?'selected':''}>1 hour</option>
+          <option value="90" ${f.duration===90?'selected':''}>1.5 hours</option>
+          <option value="120" ${f.duration===120?'selected':''}>2 hours</option>
+          <option value="180" ${f.duration===180?'selected':''}>3 hours</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Notes for this visit (optional)</label>
+        <textarea id="sched-notes" placeholder="Any prep notes, agenda items&#8230;">${f.notes||''}</textarea>
+      </div>
+      ${S.gcalStatus[a._id]?.state==='sent'?`<div class="msg ok">&#10003; Previously added to Google Calendar</div>`:''}
+      ${S.gcalStatus[a._id]?.state==='err'?`<div class="msg err">&#9888; ${S.gcalStatus[a._id].msg}</div>`:''}
+      <div id="sched-msg"></div>
+    </div>
+    <div class="modal-footer">
+      ${a.address?`<a class="map-btn" href="${mapsUrl}" target="_blank" style="margin-right:auto">&#128205; Directions</a>`:''}
+      <button id="close-modal-2">Cancel</button>
+      <button class="gcal-all" id="confirm-schedule" ${S.gcalStatus[a._id]?.state==='sending'?'disabled':''}>
+        ${S.gcalStatus[a._id]?.state==='sending'?'Adding&#8230;':'&#10003; Add to Google Calendar'}
+      </button>
+    </div>
+  </div>`;
+}
+
+/* ── MODAL BIND ── */
+function bindModalEvents(){
+  document.getElementById('close-modal')?.addEventListener('click',closeModal);
+  document.getElementById('close-modal-2')?.addEventListener('click',closeModal);
+
+  // from appt modal → open schedule modal
+  document.getElementById('open-schedule-modal')?.addEventListener('click',()=>{
+    const a=S.modal.appt;
+    S.schedForm={date:a.date?a.date.toISOString().split('T')[0]:'',time:a.time||S.defaultTime,duration:60,notes:''};
+    S.modal={type:'schedule',appt:a};
+    R();
+  });
+
+  // schedule form live update
+  document.getElementById('sched-date')?.addEventListener('input',e=>S.schedForm.date=e.target.value);
+  document.getElementById('sched-time')?.addEventListener('input',e=>S.schedForm.time=e.target.value);
+  document.getElementById('sched-duration')?.addEventListener('change',e=>S.schedForm.duration=parseInt(e.target.value));
+  document.getElementById('sched-notes')?.addEventListener('input',e=>S.schedForm.notes=e.target.value);
+
+  // confirm schedule
+  document.getElementById('confirm-schedule')?.addEventListener('click',()=>{
+    const a=S.modal.appt;
+    sendScheduledEvent(a);
+  });
+}
+
+/* ── BIND ── */
+function bind(){
+  document.getElementById('signin-btn')?.addEventListener('click',doSignIn);
+  document.getElementById('signout-btn')?.addEventListener('click',doSignOut);
+  document.getElementById('build-btn')?.addEventListener('click',buildCalendar);
+  document.getElementById('reload-btn')?.addEventListener('click',fetchSheet);
+  document.getElementById('remap-btn')?.addEventListener('click',()=>{S.phase='mapping';R();});
+  document.getElementById('prev-m')?.addEventListener('click',()=>{S.calMonth--;if(S.calMonth<0){S.calMonth=11;S.calYear--;}R();});
+  document.getElementById('next-m')?.addEventListener('click',()=>{S.calMonth++;if(S.calMonth>11){S.calMonth=0;S.calYear++;}R();});
+  document.getElementById('send-all-btn')?.addEventListener('click',sendAllToGCal);
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{S.view=t.dataset.view;R();}));
+
+  // open detail modal on row click
+  document.querySelectorAll('[data-appt]').forEach(el=>el.addEventListener('click',e=>{
+    if(e.target.closest('[data-schedule]')||e.target.closest('[data-gcal]')||e.target.tagName==='A')return;
+    const a=S.appointments.find(x=>x._id===parseInt(el.dataset.appt));
+    if(a){S.modal={type:'appt',appt:a};R();}
+  }));
+
+  // open schedule modal directly (name click or calendar chip)
+  document.querySelectorAll('[data-schedule]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation();
+    const a=S.appointments.find(x=>x._id===parseInt(el.dataset.schedule));
+    if(a){
+      S.schedForm={date:a.date?a.date.toISOString().split('T')[0]:'',time:a.time||S.defaultTime,duration:60,notes:''};
+      S.modal={type:'schedule',appt:a};
+      R();
+    }
+  }));
+
+  // individual gcal add
+  document.querySelectorAll('[data-gcal]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation();
+    const a=S.appointments.find(x=>x._id===parseInt(el.dataset.gcal));
+    if(a) quickAddToGCal(a);
+  }));
+
+  ['date','time','name','address','receptionist','notes'].forEach(f=>{
+    const el=document.getElementById(`col-${f}`);
+    if(el)el.addEventListener('change',()=>{S.cols[f]=el.value===''?'':parseInt(el.value);});
+  });
+  document.getElementById('default-time')?.addEventListener('change',e=>S.defaultTime=e.target.value);
+}
+
+/* ── GOOGLE CALENDAR ── */
+function buildEvent(a, overrides={}){
+  const dateObj=a.date||new Date();
+  const timeStr=overrides.time||parseTimeStr(a.time)||S.defaultTime||'09:00';
+  const duration=overrides.duration||60;
+  const [h,m]=timeStr.split(':').map(Number);
+  const start=new Date(dateObj.getFullYear(),dateObj.getMonth(),dateObj.getDate(),h,m,0);
+  if(overrides.date){
+    const [yr,mo,dy]=overrides.date.split('-').map(Number);
+    start.setFullYear(yr,mo-1,dy);
+  }
+  const end=new Date(start.getTime()+duration*60000);
+  const pad=n=>String(n).padStart(2,'0');
+  const fmt=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const descParts=[];
+  if(a.receptionist) descParts.push(`Receptionist: ${a.receptionist}`);
+  if(a.notes) descParts.push(`Last visit notes:\n${a.notes}`);
+  if(overrides.notes) descParts.push(`Visit notes:\n${overrides.notes}`);
+
+  return{
+    summary:a.name,
+    location:a.address||undefined,
+    description:descParts.join('\n\n')||undefined,
+    start:{dateTime:fmt(start),timeZone:tz},
+    end:{dateTime:fmt(end),timeZone:tz},
+  };
+}
+
+async function postEvent(event){
+  const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+    method:'POST',
+    headers:{Authorization:`Bearer ${S.token}`,'Content-Type':'application/json'},
+    body:JSON.stringify(event)
+  });
+  if(!res.ok){const err=await res.json();throw new Error(err.error?.message||`HTTP ${res.status}`);}
+  return res.json();
+}
+
+async function sendScheduledEvent(a){
+  const f=S.schedForm;
+  if(!f.date){
+    document.getElementById('sched-msg').innerHTML=`<div class="msg err">Please pick a date.</div>`;return;
+  }
+  S.gcalStatus[a._id]={state:'sending'};R();
+  try{
+    const event=buildEvent(a,{date:f.date,time:f.time,duration:f.duration,notes:f.notes});
+    await postEvent(event);
+    S.gcalStatus[a._id]={state:'sent'};
+    R();
+  }catch(e){
+    S.gcalStatus[a._id]={state:'err',msg:e.message};R();
+  }
+}
+
+async function quickAddToGCal(a){
+  S.gcalStatus[a._id]={state:'sending'};R();
+  try{
+    await postEvent(buildEvent(a));
+    S.gcalStatus[a._id]={state:'sent'};
+  }catch(e){
+    S.gcalStatus[a._id]={state:'err',msg:e.message};
+  }
+  R();
+}
+
+async function sendAllToGCal(){
+  const pending=S.appointments.filter(a=>!S.gcalStatus[a._id]||S.gcalStatus[a._id].state==='err');
+  if(!pending.length)return;
+  S.bulkSending=true;R();
+  for(const a of pending){
+    S.gcalStatus[a._id]={state:'sending'};
+    try{await postEvent(buildEvent(a));S.gcalStatus[a._id]={state:'sent'};}
+    catch(e){S.gcalStatus[a._id]={state:'err',msg:e.message};}
+    R();
+    await new Promise(r=>setTimeout(r,300));
+  }
+  S.bulkSending=false;R();
+}
+
+/* ── AUTH / SHEET ── */
+function doSignIn(){
+  if(!S.gsiReady){S.msg={t:'err',text:'Sign-In still loading.'};R();return;}
+  S.loading=true;S.msg=null;R();
+  try{
+    const client=google.accounts.oauth2.initTokenClient({
+      client_id:CLIENT_ID,scope:SCOPES,
+      callback:async resp=>{
+        if(resp.error){S.loading=false;S.msg={t:'err',text:`Sign-in error: ${resp.error}`};R();return;}
+        S.token=resp.access_token;
+        await fetchUserInfo();await fetchSheet();
+      }
+    });
+    client.requestAccessToken({prompt:'select_account'});
+  }catch(e){S.loading=false;S.msg={t:'err',text:e.message};R();}
+}
+
+async function fetchUserInfo(){
+  try{const r=await fetch('https://www.googleapis.com/oauth2/v2/userinfo',{headers:{Authorization:`Bearer ${S.token}`}});S.user=await r.json();}catch(e){}
+}
+
+async function fetchSheet(){
+  S.loading=true;S.msg=null;R();
+  try{
+    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A1:Z1000`,{headers:{Authorization:`Bearer ${S.token}`}});
+    if(!r.ok){const e=await r.json();throw new Error(e.error?.message||`HTTP ${r.status}`);}
+    const d=await r.json();
+    const v=d.values||[];
+    if(v.length<2)throw new Error('Sheet is empty or only has a header row.');
+    S.headers=v[0];S.rows=v.slice(1);
+    autoDetect();S.phase='mapping';S.loading=false;R();
+  }catch(e){S.loading=false;S.msg={t:'err',text:`Could not load sheet: ${e.message}`};R();}
+}
+
+function autoDetect(){
+  const hl=S.headers.map(h=>h.toLowerCase());
+  const find=kws=>{for(const kw of kws){const i=hl.findIndex(h=>h.includes(kw));if(i>=0)return i;}return'';};
+  S.cols.date=find(['date','appt date','appointment date','scheduled','datetime']);
+  S.cols.time=find(['time','appt time','start time']);
+  S.cols.name=find(['name','agent','patient','client','customer']);
+  S.cols.address=find(['address','addr','location','street']);
+  S.cols.receptionist=find(['receptionist','staff','rep','coordinator','booked']);
+  S.cols.notes=find(['notes','last visit','previous','comments','remarks','memo']);
+}
+
+function buildCalendar(){
+  if(S.cols.date===''||S.cols.name===''){S.msg={t:'err',text:'Please map at least the date and name columns.'};R();return;}
+  const appts=S.rows.map((row,i)=>({
+    _id:i,
+    date:parseDate((row[S.cols.date]||'').toString()),
+    time:S.cols.time!==''?(row[S.cols.time]||'').toString():S.defaultTime,
+    name:S.cols.name!==''?(row[S.cols.name]||'').toString():'',
+    address:S.cols.address!==''?(row[S.cols.address]||'').toString():'',
+    receptionist:S.cols.receptionist!==''?(row[S.cols.receptionist]||'').toString():'',
+    notes:S.cols.notes!==''?(row[S.cols.notes]||'').toString():'',
+  })).filter(a=>a.name||a.date);
+  if(!appts.length){S.msg={t:'err',text:'No valid appointments found.'};R();return;}
+  const first=appts.filter(a=>a.date).sort((a,b)=>a.date-b.date)[0];
+  if(first){S.calYear=first.date.getFullYear();S.calMonth=first.date.getMonth();}
+  S.appointments=appts;S.gcalStatus={};S.phase='calendar';S.msg=null;R();
+}
+
+function doSignOut(){
+  if(S.token)try{google.accounts.oauth2.revoke(S.token);}catch(e){}
+  Object.assign(S,{token:null,user:null,phase:'auth',appointments:[],rows:[],headers:[],msg:null,loading:false,gcalStatus:{},modal:null});R();
+}
+
+/* ── UTILS ── */
+function formatTime(t){
+  if(!t)return'';
+  const ts=parseTimeStr(t);if(!ts)return t;
+  const [h,m]=ts.split(':').map(Number);
+  return`${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;
+}
+
+function parseTimeStr(str){
+  if(!str)return null;str=str.trim();
+  const t24=str.match(/^(\d{1,2}):(\d{2})$/);
+  if(t24)return`${String(t24[1]).padStart(2,'0')}:${t24[2]}`;
+  const t12=str.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if(t12){let h=parseInt(t12[1]),m=parseInt(t12[2]||'0');const pm=t12[3].toLowerCase()==='pm';if(pm&&h!==12)h+=12;if(!pm&&h===12)h=0;return`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;}
+  return null;
+}
+
+function parseDate(str){
+  if(!str||!str.trim())return null;str=str.trim();
+  let d=new Date(str);if(!isNaN(d))return d;
+  const sm=str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(sm){const[,a,b,y]=sm;return new Date(y.length===2?2000+parseInt(y):parseInt(y),parseInt(a)-1,parseInt(b));}
+  const mm=str.match(/^(\d{1,2})[\s\-]([A-Za-z]{3,9})[\s\-](\d{2,4})$/);
+  if(mm){const[,d2,mon,y]=mm;const mo=MONTHS.findIndex(m=>m.toLowerCase().startsWith(mon.toLowerCase()));if(mo>=0)return new Date(y.length===2?2000+parseInt(y):parseInt(y),mo,parseInt(d2));}
+  return null;
+}
+
+window.addEventListener('load',()=>{
+  const check=setInterval(()=>{if(typeof google!=='undefined'&&google.accounts){clearInterval(check);S.gsiReady=true;R();}},100);
+  setTimeout(()=>{clearInterval(check);if(!S.gsiReady){S.msg={t:'err',text:'Google Sign-In failed to load.'};R();}},8000);
+});
+R();
+</script>
+</body>
+</html>
