@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Appointment Calendar</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f3;color:#111;font-size:14px;min-height:100vh;padding:2rem}
+h1{font-size:22px;font-weight:500;margin-bottom:1.5rem}
+button{padding:8px 18px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111;cursor:pointer;font-size:13px;transition:background .15s}
+button:hover{background:#f0f0f0}
+button.primary{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4;font-weight:500}
+button.primary:hover{background:#d0e7f7}
+button.green{background:#1a73e8;color:#fff;border-color:#1a73e8;font-weight:500}
+button.green:hover{background:#1558b0}
+button:disabled{opacity:.4;cursor:not-allowed}
+input,select,textarea{padding:9px 11px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111;font-size:14px;font-family:inherit;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#1a73e8;box-shadow:0 0 0 3px rgba(26,115,232,.1)}
+textarea{resize:vertical;min-height:72px}
+.msg{font-size:13px;padding:10px 14px;border-radius:8px;margin:10px 0;line-height:1.5}
+.err{background:#fcebeb;color:#a32d2d;border:1px solid #f7c1c1}
+.ok{background:#eaf3de;color:#3b6d11;border:1px solid #c0dd97}
+.info{background:#e6f1fb;color:#185fa5;border:1px solid #b5d4f4}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.field label{font-size:12px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.col-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+/* Card */
+.card{background:#fff;border:1px solid #e5e5e5;border-radius:14px;padding:1.5rem;max-width:520px;margin-bottom:1.5rem}
+/* Search box */
+.search-wrap{position:relative;margin-bottom:1.25rem}
+.search-wrap input{font-size:15px;padding:11px 16px 11px 42px;border-radius:10px;border:1.5px solid #ccc}
+.search-wrap input:focus{border-color:#1a73e8}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#888;font-size:17px;pointer-events:none}
+.dropdown{background:#fff;border:1px solid #ddd;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.1);max-height:260px;overflow-y:auto;margin-top:4px}
+.dropdown-item{padding:11px 14px;cursor:pointer;border-bottom:1px solid #f5f5f5;transition:background .1s}
+.dropdown-item:last-child{border-bottom:none}
+.dropdown-item:hover,.dropdown-item.focused{background:#f0f6ff}
+.dropdown-item .di-name{font-size:14px;font-weight:500;color:#111}
+.dropdown-item .di-sub{font-size:12px;color:#888;margin-top:2px}
+.dropdown-empty{padding:14px;color:#888;font-size:13px;text-align:center}
+/* Selected agent card */
+.agent-card{background:#f0f6ff;border:1.5px solid #b5d4f4;border-radius:12px;padding:14px 16px;margin-bottom:1.25rem;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.agent-card-info .name{font-size:16px;font-weight:600;color:#111;margin-bottom:3px}
+.agent-card-info .addr{font-size:12px;color:#555;margin-bottom:2px}
+.agent-card-info .recep{font-size:12px;color:#555;margin-bottom:6px}
+.agent-card-info .notes-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+.agent-card-info .notes-text{font-size:12px;color:#444;background:#fff;border-radius:6px;padding:7px 10px;border-left:3px solid #b5d4f4;line-height:1.5}
+.agent-clear{background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:0;flex-shrink:0;line-height:1}
+.agent-clear:hover{color:#a32d2d}
+/* Schedule form */
+.form-section{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px;margin-bottom:1.25rem}
+.form-section-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:12px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* Overlay / Modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
+.modal{background:#fff;border-radius:16px;max-width:440px;width:100%;overflow:hidden;max-height:90vh;overflow-y:auto}
+.modal-head{padding:18px 22px 14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}
+.modal-head h3{font-size:16px;font-weight:600}
+.close-x{background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:0;line-height:1}
+.close-x:hover{color:#111}
+.modal-body{padding:20px 22px}
+.modal-footer{padding:14px 22px;border-top:1px solid #f0f0f0;display:flex;gap:8px;justify-content:flex-end}
+.modal-footer button{min-width:90px}
+/* Ubar */
+.ubar{display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid #e5e5e5}
+.avatar{width:34px;height:34px;border-radius:50%;background:#e6f1fb;color:#185fa5;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0}
+.preview-table{overflow-x:auto;margin-bottom:1rem;background:#f9f9f8;border-radius:8px;padding:10px}
+.preview-table table{border-collapse:collapse;width:100%}
+.preview-table th{text-align:left;padding:3px 10px 3px 0;font-size:11px;font-weight:500;border-bottom:1px solid #e5e5e5;white-space:nowrap}
+.preview-table td{padding:3px 10px 3px 0;font-size:11px;color:#666}
+#app{max-width:580px;margin:0 auto}
+.divider{border:none;border-top:1px solid #eee;margin:16px 0}
+.maps-link{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#1a73e8;text-decoration:none;margin-top:4px}
+.maps-link:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>&#128197; Schedule a Visit</h1>
+  <div id="root"></div>
+</div>
+
+<script>
+const CLIENT_ID='445310454939-449aqo6u0akjaoc24f0tgb6kt3bbnfge.apps.googleusercontent.com';
+const SHEET_ID='1QXCdOj4RH9OeFnQ2rSu3laqD8z8MIfN6QSrh9yeOP3I';
+const SCOPES='https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/calendar.events';
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+let S={
+  phase:'auth',       // auth | mapping | main
+  token:null,user:null,
+  headers:[],rows:[],
+  cols:{name:'',address:'',receptionist:'',notes:''},
+  agents:[],          // [{_id, name, address, receptionist, notes}]
+  searchQ:'',
+  selectedAgent:null,
+  showDropdown:false,
+  focusedIdx:-1,
+  schedForm:{date:'',time:'09:00',duration:60,visitNotes:''},
+  gcalState:null,     // null | 'sending' | 'sent' | {err}
+  msg:null,loading:false,gsiReady:false,
+};
+
+function todayStr(){return new Date().toISOString().split('T')[0];}
+
+/* ─── RENDER ─── */
+function R(){
+  const root=document.getElementById('root');
+  if(!root)return;
+  root.innerHTML='';
+  const el=document.createElement('div');
+  if(S.phase==='auth') el.innerHTML=renderAuth();
+  else if(S.phase==='mapping') el.innerHTML=renderMapping();
+  else el.innerHTML=renderMain();
+  root.appendChild(el);
+  // overlay
+  document.getElementById('overlay')?.remove();
+  if(S.gcalState==='sent'){
+    const ov=document.createElement('div');
+    ov.className='overlay';ov.id='overlay';
+    ov.innerHTML=renderSuccessModal();
+    document.body.appendChild(ov);
+    document.getElementById('modal-ok')?.addEventListener('click',()=>{
+      S.gcalState=null;S.selectedAgent=null;S.searchQ='';S.schedForm={date:'',time:'09:00',duration:60,visitNotes:''};
+      document.getElementById('overlay')?.remove();R();
+    });
+    ov.addEventListener('click',e=>{if(e.target.id==='overlay'){
+      S.gcalState=null;S.selectedAgent=null;S.searchQ='';S.schedForm={date:'',time:'09:00',duration:60,visitNotes:''};
+      document.getElementById('overlay')?.remove();R();
+    }});
+  }
+  bind();
+}
+
+/* ─── AUTH ─── */
+function renderAuth(){
+  return`<div class="card">
+    <div class="info msg" style="margin-bottom:14px">&#128274; Sign in with Google to load your agents and schedule visits.</div>
+    ${S.msg?`<div class="msg ${S.msg.t}">${S.msg.text}</div>`:''}
+    <button class="primary" id="signin-btn" ${S.loading||!S.gsiReady?'disabled':''} style="width:100%;padding:12px;font-size:14px">
+      ${!S.gsiReady?'Loading&#8230;':S.loading?'Signing in&#8230;':'&#128101; Sign in with Google'}
+    </button>
+  </div>`;
+}
+
+/* ─── MAPPING ─── */
+function renderMapping(){
+  const labels={name:'Agent name',address:'Address',receptionist:"Receptionist's name",notes:'Last visit notes'};
+  const sel=f=>`<select id="col-${f}"><option value="">— select —</option>${S.headers.map((h,i)=>`<option value="${i}"${S.cols[f]===i?' selected':''}>${h}</option>`).join('')}</select>`;
+  const preview=S.rows.slice(0,3).map(r=>`<tr>${S.headers.map((_,i)=>`<td>${(r[i]||'').toString().slice(0,28)}</td>`).join('')}</tr>`).join('');
+  return`${ubar()}
+  <div class="ok msg">&#10003; Loaded ${S.rows.length} agents. Map your columns below.</div>
+  ${S.msg?`<div class="msg ${S.msg.t}">${S.msg.text}</div>`:''}
+  <div class="preview-table"><table><tr>${S.headers.map(h=>`<th>${h}</th>`).join('')}</tr>${preview}</table></div>
+  <div class="col-grid">${Object.keys(labels).map(f=>`<div class="field"><label>${labels[f]}</label>${sel(f)}</div>`).join('')}</div>
+  <div style="display:flex;gap:8px">
+    <button class="primary" id="build-btn">Continue &#8594;</button>
+    <button id="reload-btn">&#8635; Reload</button>
+  </div>`;
+}
+
+/* ─── MAIN ─── */
+function renderMain(){
+  const filtered=S.agents.filter(a=>a.name.toLowerCase().includes(S.searchQ.toLowerCase()));
+  const sel=S.selectedAgent;
+  const f=S.schedForm;
+
+  // Search / dropdown section
+  const dropdownHTML=S.showDropdown&&S.searchQ?`
+    <div class="dropdown" id="dropdown">
+      ${filtered.length?filtered.map((a,i)=>`
+        <div class="dropdown-item${S.focusedIdx===i?' focused':''}" data-agent="${a._id}">
+          <div class="di-name">${highlight(a.name,S.searchQ)}</div>
+          ${a.address?`<div class="di-sub">&#128205; ${a.address}</div>`:''}
+        </div>`).join('')
+      :`<div class="dropdown-empty">No agents found</div>`}
+    </div>`:'';
+
+  // Selected agent card
+  const agentCard=sel?`
+    <div class="agent-card">
+      <div class="agent-card-info">
+        <div class="name">&#128464; ${sel.name}</div>
+        ${sel.address?`<div class="addr">&#128205; ${sel.address}</div>`:''}
+        ${sel.receptionist?`<div class="recep">&#128100; ${sel.receptionist}</div>`:''}
+        ${sel.notes?`<div class="notes-label">Last visit notes</div><div class="notes-text">${sel.notes}</div>`:''}
+        ${sel.address?`<a class="maps-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sel.address)}" target="_blank">&#128205; Get directions</a>`:''}
+      </div>
+      <button class="agent-clear" id="clear-agent" title="Choose a different agent">&#10005;</button>
+    </div>`:'';
+
+  // Schedule form (only shown when agent selected)
+  const schedForm=sel?`
+    <div class="form-section">
+      <div class="form-section-title">&#128336; Schedule appointment</div>
+      <div class="form-row" style="margin-bottom:14px">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="sched-date" value="${f.date||todayStr()}" min="${todayStr()}"/>
+        </div>
+        <div class="field">
+          <label>Start time</label>
+          <input type="time" id="sched-time" value="${f.time||'09:00'}"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Duration</label>
+        <select id="sched-duration">
+          <option value="30"${f.duration===30?' selected':''}>30 minutes</option>
+          <option value="45"${f.duration===45?' selected':''}>45 minutes</option>
+          <option value="60"${f.duration===60?' selected':''}>1 hour</option>
+          <option value="90"${f.duration===90?' selected':''}>1.5 hours</option>
+          <option value="120"${f.duration===120?' selected':''}>2 hours</option>
+          <option value="180"${f.duration===180?' selected':''}>3 hours</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Visit notes (optional)</label>
+        <textarea id="sched-visit-notes" placeholder="Agenda, reminders, prep notes&#8230;">${f.visitNotes||''}</textarea>
+      </div>
+      ${S.gcalState==='sending'?`<div class="msg info">&#8230; Adding to Google Calendar</div>`:''}
+      ${S.gcalState&&S.gcalState.err?`<div class="msg err">&#9888; ${S.gcalState.err}</div>`:''}
+      <button class="green" id="confirm-schedule" style="width:100%;padding:11px;margin-top:4px" ${S.gcalState==='sending'?'disabled':''}>
+        ${S.gcalState==='sending'?'Adding&#8230;':'&#10003; Add to Google Calendar'}
+      </button>
+    </div>`:'';
+
+  return`${ubar()}
+  <div style="position:relative">
+    <div class="search-wrap">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" id="agent-search" placeholder="Search agent by name&#8230;" value="${S.searchQ}" autocomplete="off"/>
+    </div>
+    ${dropdownHTML}
+  </div>
+  ${agentCard}
+  ${schedForm}`;
+}
+
+function renderSuccessModal(){
+  const a=S.selectedAgent;
+  const f=S.schedForm;
+  const dateLabel=f.date?new Date(f.date+'T12:00:00').toDateString():'';
+  return`<div class="modal">
+    <div class="modal-head"><h3>&#10003; Appointment scheduled!</h3></div>
+    <div class="modal-body">
+      <div style="font-size:15px;font-weight:600;margin-bottom:8px">${a?.name||''}</div>
+      ${a?.address?`<div style="font-size:13px;color:#555;margin-bottom:4px">&#128205; ${a.address}</div>`:''}
+      <div style="font-size:13px;color:#555;margin-bottom:4px">&#128336; ${dateLabel} at ${formatTime(f.time)}</div>
+      <div style="font-size:13px;color:#555;margin-bottom:12px">&#9200; ${durationLabel(f.duration)}</div>
+      ${a?.address?`<a class="maps-link" style="font-size:13px" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.address)}" target="_blank">&#128205; Open directions in Google Maps</a>`:''}
+      <div class="msg ok" style="margin-top:14px">Added to your Google Calendar.</div>
+    </div>
+    <div class="modal-footer"><button class="primary" id="modal-ok" style="width:100%">Schedule another</button></div>
+  </div>`;
+}
+
+function highlight(text,q){
+  if(!q)return text;
+  const idx=text.toLowerCase().indexOf(q.toLowerCase());
+  if(idx<0)return text;
+  return text.slice(0,idx)+`<strong>${text.slice(idx,idx+q.length)}</strong>`+text.slice(idx+q.length);
+}
+
+function durationLabel(d){
+  if(d<60)return`${d} minutes`;
+  if(d===60)return'1 hour';
+  if(d%60===0)return`${d/60} hours`;
+  return`${Math.floor(d/60)}h ${d%60}m`;
+}
+
+/* ─── BIND ─── */
+function bind(){
+  document.getElementById('signin-btn')?.addEventListener('click',doSignIn);
+  document.getElementById('signout-btn')?.addEventListener('click',doSignOut);
+  document.getElementById('build-btn')?.addEventListener('click',buildAgents);
+  document.getElementById('reload-btn')?.addEventListener('click',fetchSheet);
+  document.getElementById('clear-agent')?.addEventListener('click',()=>{S.selectedAgent=null;S.searchQ='';S.gcalState=null;R();});
+  document.getElementById('confirm-schedule')?.addEventListener('click',confirmSchedule);
+
+  // schedule form inputs
+  document.getElementById('sched-date')?.addEventListener('input',e=>S.schedForm.date=e.target.value);
+  document.getElementById('sched-time')?.addEventListener('input',e=>S.schedForm.time=e.target.value);
+  document.getElementById('sched-duration')?.addEventListener('change',e=>S.schedForm.duration=parseInt(e.target.value));
+  document.getElementById('sched-visit-notes')?.addEventListener('input',e=>S.schedForm.visitNotes=e.target.value);
+
+  // column mapping
+  ['name','address','receptionist','notes'].forEach(f=>{
+    const el=document.getElementById(`col-${f}`);
+    if(el)el.addEventListener('change',()=>{S.cols[f]=el.value===''?'':parseInt(el.value);});
+  });
+
+  // search
+  const searchEl=document.getElementById('agent-search');
+  if(searchEl){
+    searchEl.focus();
+    searchEl.addEventListener('input',e=>{
+      S.searchQ=e.target.value;
+      S.showDropdown=true;
+      S.focusedIdx=-1;
+      R();
+      document.getElementById('agent-search')?.focus();
+    });
+    searchEl.addEventListener('focus',()=>{if(S.searchQ){S.showDropdown=true;R();document.getElementById('agent-search')?.focus();}});
+    searchEl.addEventListener('keydown',e=>{
+      const filtered=S.agents.filter(a=>a.name.toLowerCase().includes(S.searchQ.toLowerCase()));
+      if(e.key==='ArrowDown'){e.preventDefault();S.focusedIdx=Math.min(S.focusedIdx+1,filtered.length-1);R();document.getElementById('agent-search')?.focus();}
+      else if(e.key==='ArrowUp'){e.preventDefault();S.focusedIdx=Math.max(S.focusedIdx-1,0);R();document.getElementById('agent-search')?.focus();}
+      else if(e.key==='Enter'&&S.focusedIdx>=0){selectAgent(filtered[S.focusedIdx]);}
+      else if(e.key==='Escape'){S.showDropdown=false;R();}
+    });
+    // close dropdown on outside click
+    document.addEventListener('mousedown',e=>{
+      if(!e.target.closest('#dropdown')&&!e.target.closest('#agent-search')){
+        S.showDropdown=false;R();
+      }
+    },{once:true});
+  }
+
+  // dropdown item clicks
+  document.querySelectorAll('[data-agent]').forEach(el=>el.addEventListener('click',()=>{
+    const a=S.agents.find(x=>x._id===parseInt(el.dataset.agent));
+    if(a)selectAgent(a);
+  }));
+}
+
+function selectAgent(a){
+  S.selectedAgent=a;
+  S.searchQ=a.name;
+  S.showDropdown=false;
+  S.gcalState=null;
+  S.schedForm={date:todayStr(),time:'09:00',duration:60,visitNotes:''};
+  R();
+}
+
+/* ─── GOOGLE CALENDAR ─── */
+async function confirmSchedule(){
+  const a=S.selectedAgent;
+  const f=S.schedForm;
+  if(!f.date){S.gcalState={err:'Please select a date.'};R();return;}
+  S.gcalState='sending';R();
+  try{
+    const [yr,mo,dy]=f.date.split('-').map(Number);
+    const [h,m]=f.time.split(':').map(Number);
+    const start=new Date(yr,mo-1,dy,h,m,0);
+    const end=new Date(start.getTime()+f.duration*60000);
+    const pad=n=>String(n).padStart(2,'0');
+    const fmt=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+    const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const descParts=[];
+    if(a.receptionist)descParts.push(`Receptionist: ${a.receptionist}`);
+    if(a.notes)descParts.push(`Last visit notes:\n${a.notes}`);
+    if(f.visitNotes)descParts.push(`Visit notes:\n${f.visitNotes}`);
+    const event={
+      summary:a.name,
+      location:a.address||undefined,
+      description:descParts.join('\n\n')||undefined,
+      start:{dateTime:fmt(start),timeZone:tz},
+      end:{dateTime:fmt(end),timeZone:tz},
+    };
+    const res=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+      method:'POST',
+      headers:{Authorization:`Bearer ${S.token}`,'Content-Type':'application/json'},
+      body:JSON.stringify(event)
+    });
+    if(!res.ok){const err=await res.json();throw new Error(err.error?.message||`HTTP ${res.status}`);}
+    S.gcalState='sent';R();
+  }catch(e){
+    S.gcalState={err:e.message};R();
+  }
+}
+
+/* ─── AUTH / SHEET ─── */
+function doSignIn(){
+  if(!S.gsiReady){S.msg={t:'err',text:'Sign-In still loading.'};R();return;}
+  S.loading=true;S.msg=null;R();
+  try{
+    const client=google.accounts.oauth2.initTokenClient({
+      client_id:CLIENT_ID,scope:SCOPES,
+      callback:async resp=>{
+        if(resp.error){S.loading=false;S.msg={t:'err',text:`Sign-in error: ${resp.error}`};R();return;}
+        S.token=resp.access_token;
+        await fetchUserInfo();await fetchSheet();
+      }
+    });
+    client.requestAccessToken({prompt:'select_account'});
+  }catch(e){S.loading=false;S.msg={t:'err',text:e.message};R();}
+}
+
+async function fetchUserInfo(){
+  try{const r=await fetch('https://www.googleapis.com/oauth2/v2/userinfo',{headers:{Authorization:`Bearer ${S.token}`}});S.user=await r.json();}catch(e){}
+}
+
+async function fetchSheet(){
+  S.loading=true;S.msg=null;R();
+  try{
+    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A1:Z1000`,{headers:{Authorization:`Bearer ${S.token}`}});
+    if(!r.ok){const e=await r.json();throw new Error(e.error?.message||`HTTP ${r.status}`);}
+    const d=await r.json();
+    const v=d.values||[];
+    if(v.length<2)throw new Error('Sheet is empty or has only a header row.');
+    S.headers=v[0];S.rows=v.slice(1);
+    autoDetect();S.phase='mapping';S.loading=false;R();
+  }catch(e){S.loading=false;S.msg={t:'err',text:`Could not load sheet: ${e.message}`};R();}
+}
+
+function autoDetect(){
+  const hl=S.headers.map(h=>h.toLowerCase());
+  const find=kws=>{for(const kw of kws){const i=hl.findIndex(h=>h.includes(kw));if(i>=0)return i;}return'';};
+  S.cols.name=find(['name','agent','patient','client','customer']);
+  S.cols.address=find(['address','addr','location','street']);
+  S.cols.receptionist=find(['receptionist','staff','rep','coordinator','booked']);
+  S.cols.notes=find(['notes','last visit','previous','comments','remarks','memo']);
+}
+
+function buildAgents(){
+  if(S.cols.name===''){S.msg={t:'err',text:'Please map the agent name column.'};R();return;}
+  const agents=S.rows.map((row,i)=>({
+    _id:i,
+    name:(row[S.cols.name]||'').toString().trim(),
+    address:S.cols.address!==''?(row[S.cols.address]||'').toString().trim():'',
+    receptionist:S.cols.receptionist!==''?(row[S.cols.receptionist]||'').toString().trim():'',
+    notes:S.cols.notes!==''?(row[S.cols.notes]||'').toString().trim():'',
+  })).filter(a=>a.name);
+  if(!agents.length){S.msg={t:'err',text:'No agents found. Check your name column mapping.'};R();return;}
+  // deduplicate by name (keep last row per name for latest notes)
+  const seen={};
+  agents.forEach(a=>{seen[a.name.toLowerCase()]=a;});
+  S.agents=Object.values(seen).sort((a,b)=>a.name.localeCompare(b.name));
+  S.phase='main';S.msg=null;R();
+}
+
+function doSignOut(){
+  if(S.token)try{google.accounts.oauth2.revoke(S.token);}catch(e){}
+  Object.assign(S,{token:null,user:null,phase:'auth',agents:[],rows:[],headers:[],msg:null,loading:false,selectedAgent:null,searchQ:'',gcalState:null});R();
+}
+
+function ubar(){
+  if(!S.user)return'';
+  return`<div class="ubar">
+    <div class="avatar">${(S.user.name||S.user.email||'?').charAt(0).toUpperCase()}</div>
+    <div style="flex:1"><div style="font-size:13px;font-weight:500">${S.user.name||''}</div><div style="font-size:11px;color:#888">${S.user.email||''}</div></div>
+    <button id="signout-btn" style="font-size:12px">Switch account</button>
+  </div>`;
+}
+
+function formatTime(t){
+  if(!t)return'';
+  const [h,m]=t.split(':').map(Number);
+  return`${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;
+}
+
+window.addEventListener('load',()=>{
+  const check=setInterval(()=>{if(typeof google!=='undefined'&&google.accounts){clearInterval(check);S.gsiReady=true;R();}},100);
+  setTimeout(()=>{clearInterval(check);if(!S.gsiReady){S.msg={t:'err',text:'Google Sign-In failed to load.'};R();}},8000);
+});
+R();
+</script>
+</body>
+</html>
